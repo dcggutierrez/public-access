@@ -1,0 +1,274 @@
+global:
+  ldapDomain: "ustapps.com"
+  existingSecret: "openldap-secrets"
+replicaCount: 3
+customSchemaFiles:
+  00-memberof.ldif: |-
+    dn: cn=module,cn=config
+    cn: module
+    objectClass: olcModuleList
+    olcModuleLoad: memberof
+    olcModulePath: /opt/bitnami/openldap/lib/openldap
+
+    dn: olcOverlay=memberof,olcDatabase={2}mdb,cn=config
+    changetype: add
+    objectClass: olcOverlayConfig
+    objectClass: olcMemberOf
+    olcOverlay: memberof
+    olcMemberOfRefint: TRUE
+customLdifFiles:
+  00-root.ldif: |-
+    dn: dc=ustapps,dc=com
+    objectClass: dcObject
+    objectClass: organization
+    o: UST, Inc
+  01-people-group.ldif: |-
+    dn: ou=people,dc=ustapps,dc=com
+    objectclass: organizationalUnit
+    objectclass: top
+    ou: people
+  02-applications-group.ldif: |-
+    dn: ou=applications,dc=ustapps,dc=com
+    objectclass: organizationalUnit
+    objectclass: top
+    ou: applications
+  03-groups-group.ldif: |-
+    dn: ou=groups,dc=ustapps,dc=com
+    objectclass: organizationalUnit
+    objectclass: top
+    ou: groups
+  04-server-group.ldif: |-
+    dn: ou=server,dc=ustapps,dc=com
+    objectclass: organizationalUnit
+    objectclass: top
+    ou: server
+  05-pla-app.ldif: |-
+    dn: cn=pla,ou=applications,dc=ustapps,dc=com
+    cn: pla
+    description: phpLDAPAdmin
+    objectclass: organizationalRole
+    objectclass: top
+    objectclass: simpleSecurityObject
+    userpassword: {SSHA}xxxxxxxxxx
+  06-ssp-app.ldif: |-
+    dn: cn=ssp,ou=applications,dc=ustapps,dc=com
+    cn: ssp
+    description: Self-service password
+    objectclass: organizationalRole
+    objectclass: top
+    objectclass: simpleSecurityObject
+    userpassword: {SSHA}xxxxxxxxxx
+customAcls: |-
+   dn: olcDatabase={2}mdb,cn=config
+   changetype: modify
+   replace: olcAccess
+   olcAccess: {0}to attrs=userPassword,shadowLastChange
+     by self write
+     by dn="cn=admin,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by anonymous auth
+     by * none
+   olcAccess: {1}to dn.children="ou=people,dc=ustapps,dc=com"
+     by dn.exact="cn=admin,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by dn.children="ou=applications,dc=ustapps,dc=com" read
+     by self read
+     by anonymous auth
+     by * none
+   olcAccess: {2}to dn.children="ou=groups,dc=ustapps,dc=com"
+     by dn.exact="cn=admin,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by dn.children="ou=applications,dc=ustapps,dc=com" read
+     by self read
+     by anonymous auth
+     by * none
+   olcAccess: {3}to dn.children="ou=applications,dc=ustapps,dc=com"
+     by dn.exact="cn=admin,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by dn.children="ou=applications,dc=ustapps,dc=com" read
+     by self read
+     by anonymous auth
+     by * none
+   olcAccess: {4}to dn.children="ou=server,dc=ustapps,dc=com"
+     by dn.exact="cn=admin,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by dn.children="ou=applications,dc=ustapps,dc=com" read
+     by self read
+     by anonymous auth
+     by * none
+   olcAccess: {5}to *
+     by dn="cn=admin,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write    
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
+     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
+     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
+     by dn.children="ou=applications,dc=ustapps,dc=com" search
+     by self read
+     by * none
+persistence:
+  size: 8Gi
+ltb-passwd:
+  initContainers:
+    - name: update-sendtoken
+      image: "{{ tpl .Values.image.repository . }}:{{ tpl .Values.image.tag . }}"
+      command: [sh, -c]
+      args:
+        - |-
+          cat <<EOF >/data/32-sendtoken
+          #!/command/with-contenv bash
+          source /assets/functions/00-container
+          PROCESS_NAME="sendtoken"
+          rm -f /www/ssp/pages/sendtoken.php
+          cp /tmp/sendtoken.php /www/ssp/pages/
+          chmod +x /data/32-sendtoken
+          liftoff
+          EOF
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: ltb-passwd-res
+      configMap:
+        name: ltb-passwd-res
+    - name: data
+      emptyDir: {}
+  volumeMounts:
+    - name: ltb-passwd-res
+      mountPath: /tmp/sendtoken.php
+      subPath: sendtoken.php
+    - name: data
+      mountPath: /etc/cont-init.d/32-sendtoken
+      subPath: 32-sendtoken
+  env:
+    - name: LDAP_FILTER
+      value: "(uid={login})"
+    - name: MAIL_USE_LDAP
+      value: "true"
+    - name: NOTIFY_ON_CHANGE
+      value: "true"
+    - name: SMTP_AUTH_ON
+      value: "true"
+    - name: SMTP_AUTOTLS
+      value: "false"
+    - name: SMTP_SECURE_TYPE
+      value: "tls"
+    - name: SMTP_HOST
+      value: "smtp-mail.outlook.com"
+    - name: SMTP_PORT
+      value: "587"
+    - name: MAIL_FROM
+      value: "info@ustapps.com"
+    - name: SMTP_USER
+      value: "info@ustapps.com"
+    - name: SMTP_PASS
+      valueFrom:
+        secretKeyRef:
+          name: openldap-secrets
+          key: SMTP_PASSWORD
+    - name: ENABLE_RESET_LOG
+      value: "true"
+    - name: USE_RECAPTCHA
+      value: "true"
+    - name: RECAPTCHA_PUB_KEY
+      valueFrom:
+        secretKeyRef:
+          name: openldap-secrets
+          key: RECAPTCHA_PUB_KEY
+    - name: RECAPTCHA_PRIV_KEY
+      valueFrom:
+        secretKeyRef:
+          name: openldap-secrets
+          key: RECAPTCHA_PRIV_KEY
+    - name: IS_BEHIND_PROXY
+      value: "true"
+  ingress:
+    enabled: false
+  ldap:
+    searchBase: "ou=people,dc=ustapps,dc=com"
+    bindDN: "cn=ssp,ou=applications,dc=ustapps,dc=com"
+    passKey: LDAP_SSP_PASSWORD
+phpldapadmin:
+  ingress:
+    enabled: false
+  initContainers:
+     - name: modify-configuration
+       image: "{{ tpl .Values.image.repository . }}:{{ tpl .Values.image.tag . }}"
+       command: [sh, -c]
+       args:
+         - |-
+           # adapt config.php: allow login without complete dn (only username) - needs admin read account
+           # use also binddn with restricted permissions (read only)
+           cat <<EOF >/data/my_config.php
+           \$servers->setValue('login','attr','uid');
+           \$servers->setValue('login','fallback_dn',true);
+           \$servers->setValue('login','bind_id','cn=pla,ou=applications,dc=ustapps,dc=com');
+           \$servers->setValue('login','bind_pass','${LDAP_PLA_PASSWORD}');
+           EOF
+           # modify startup script in order to use modified config.php
+           cp -p /container/service/phpldapadmin/startup.sh /data/
+           sed -i -e 's/exit 0/# exit 0/' /data/startup.sh
+           cat <<'EOF' >>/data/startup.sh
+           # unlock uidNumber and gidNumber fields
+           sed -i s/\<readonly\>1\<\\/readonly\>/\<readonly\>0\<\\/readonly\>/ /var/www/phpldapadmin/templates/creation/posixGroup.xml
+           sed -i s/\<readonly\>1\<\\/readonly\>/\<readonly\>0\<\\/readonly\>/ /var/www/phpldapadmin/templates/creation/posixAccount.xml
+           sed -i -e 's/\($servers->setValue..login.,.bind_id\)/#\1/' /var/www/phpldapadmin/config/config.php
+           cat /data/my_config.php >> /var/www/phpldapadmin/config/config.php
+           exit 0
+           EOF
+       volumeMounts:
+         - mountPath: /data
+           name: data
+       env:
+         - name: LDAP_PLA_PASSWORD
+           valueFrom:
+             secretKeyRef:
+               name: openldap-secrets
+               key: LDAP_PLA_PASSWORD
+  volumes:
+    - name: data
+      emptyDir: {}
+  volumeMounts:
+    - name: data
+      mountPath: /data
+    - name: data
+      mountPath: /container/service/phpldapadmin/startup.sh
+      subPath: startup.sh
