@@ -1,4 +1,27 @@
-su -
+# allow-hotplug enp0s3
+auto enp0s3
+iface enp0s3 inet dhcp
+
+auto enp0s3:0
+iface enp0s3:0 inet static
+	address 192.168.xxx.xxx
+	netmask 255.255.252.0
+
+
+192.168.157.31   dev-ph01.ustapps.com dev-ph01
+192.168.157.32   dev-ph02.ustapps.com dev-ph02
+192.168.157.33   dev-ph03.ustapps.com dev-ph03
+192.168.157.34   dev-ph04.ustapps.com dev-ph04
+192.168.157.35   dev-ph05.ustapps.com dev-ph05
+192.168.157.36   dev-ph06.ustapps.com dev-ph06
+192.168.157.37   dev-ph07.ustapps.com dev-ph07
+
+192.168.157.1   dev-cluster-ph01.ustapps.com dev-cluster-ph01
+192.168.157.2   dev-ldap-ph01.ustapps.com dev-ldap-ph01
+
+
+
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-cluster-ph01.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.31su -
 
 visudo
 
