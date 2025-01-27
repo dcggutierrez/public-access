@@ -49,7 +49,7 @@ customLdifFiles:
     objectclass: organizationalRole
     objectclass: top
     objectclass: simpleSecurityObject
-    userpassword: {SSHA}yCFLATeQcVjsVASe3uMBWq76PpxnlFc5
+    userpassword: {SSHA}LYGeHsPmSy7rcMZae74DGf2WUSjAyLMo
   06-ssp-app.ldif: |-
     dn: cn=ssp,ou=applications,dc=ustapps,dc=com
     cn: ssp
@@ -57,7 +57,7 @@ customLdifFiles:
     objectclass: organizationalRole
     objectclass: top
     objectclass: simpleSecurityObject
-    userpassword: {SSHA}yCFLATeQcVjsVASe3uMBWq76PpxnlFc5
+    userpassword: {SSHA}LYGeHsPmSy7rcMZae74DGf2WUSjAyLMo
 customAcls: |-
    dn: olcDatabase={2}mdb,cn=config
    changetype: modify
