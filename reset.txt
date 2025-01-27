@@ -1,0 +1,152 @@
+sudo kubeadm reset --cri-socket=unix:///var/run/cri-dockerd.sock
+sudo kubeadm reset --cri-socket=unix:///var/run/containerd/containerd.sock
+sudo rm -rf /etc/kubernetes /var/lib/etcd /etc/cni/net.d /var/lib/cni ~/.kube
+
+mkdir -p /etc/kubernetes/manifests
+nano /etc/kubernetes/manifests/keepalived.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  name: keepalived
+  namespace: kube-system
+spec:
+  containers:
+  - image: osixia/keepalived:2.0.20
+    name: keepalived
+    resources: {}
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_BROADCAST
+        - NET_RAW
+    volumeMounts:
+    - mountPath: /usr/local/etc/keepalived/keepalived.conf
+      name: config
+    - mountPath: /etc/keepalived/check_apiserver.sh
+      name: check
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/keepalived/keepalived.conf
+    name: config
+  - hostPath:
+      path: /etc/keepalived/check_apiserver.sh
+    name: check
+status: {}
+
+touch /etc/haproxy/spoe-auth.conf
+nano /etc/kubernetes/manifests/haproxy.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: haproxy
+  namespace: kube-system
+spec:
+  containers:
+  - image: docker.ustapps.com/server/haproxy:0.1.1
+    name: haproxy
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: localhost
+        path: /healthz
+        port: 7443
+        scheme: HTTPS
+    volumeMounts:
+    - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+      name: haproxyconf
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/ssl
+      name: haproxyssl
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/spoe-auth.conf
+      name: haproxyspoe
+      readOnly: true
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/haproxy/haproxy.cfg
+      type: FileOrCreate
+    name: haproxyconf
+  - hostPath:
+      path: /etc/haproxy/ssl
+      type: DirectoryOrCreate
+    name: haproxyssl
+  - hostPath:
+      path: /etc/haproxy/spoe-auth.conf
+      type: FileOrCreate
+    name: haproxyspoe
+status: {}
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-us1.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.31
+
+kubeadm join dev-us1.ustapps.com:7443 \
+  --token hos3nx.vmsxbjs9msmvczs6  \
+  --discovery-token-ca-cert-hash sha256:575143f986dfd2296fa195f5e3177e781d0a33871a32d5278460a2fbc73beac2 \
+  --control-plane \
+  --certificate-key 2037322f0ec7e097eafe42313777e17b4f9ee91fe4e8c93103ea6475b95bcac8  \
+  --cri-socket=unix:///var/run/cri-dockerd.sock \
+  --apiserver-advertise-address=192.168.157.32 -v=5
+ 
+kubeadm join dev-us1.ustapps.com:7443 \
+  --token hos3nx.vmsxbjs9msmvczs6 \
+  --discovery-token-ca-cert-hash sha256:575143f986dfd2296fa195f5e3177e781d0a33871a32d5278460a2fbc73beac2 \
+  --cri-socket=unix:///var/run/cri-dockerd.sock 
+
+  --node-ip=192.168.157.33 -v=5
+
+nano /var/lib/kubelet/config.yaml
+
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+nodeIP: 192.168.157.33
+
+kubeadm token list
+
+openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | \
+openssl rsa -pubin -outform der 2>/dev/null | \
+openssl dgst -sha256 -hex | sed 's/^.* //'
+
+575143f986dfd2296fa195f5e3177e781d0a33871a32d5278460a2fbc73beac2
+
+kubeadm init phase upload-certs --upload-certs
+
+wget https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+nano kube-flannel.yml
+
+      containers:
+      - args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        - --iface-can-reach=192.168.144.0
+        command:
+        - /opt/bin/flanneld
+        env:
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+kubectl apply -f kube-flannel.yml
+
+kubectl get service kube-dns -n kube-system
+
+nano /etc/resolv.conf
+
+domain ustapps.com
+search ustapps.com cluster.local
+nameserver 10.96.0.10
+nameserver 192.168.1.1
+nameserver 8.8.8.8
+
+nano /etc/dhcp/dhclient.conf
+
+supersede domain-name "ustapps.com";
+prepend domain-name-servers 10.96.0.10;
+
+nano /etc/kubernetes/manifests/haproxy.yaml 
+
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-cluster-us1.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.51
