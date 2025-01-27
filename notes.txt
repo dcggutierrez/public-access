@@ -1,0 +1,158 @@
+su -
+
+visudo
+
+# User privelage specification
+root ALL=(ALL:ALL) ALL
+localadmin ALL=(ALL:ALL) ALL
+#save
+
+usermod -aG sudo localadmin
+
+groups localadmin
+
+sudowhoaim
+
+
+ip address
+
+nano /etc/ssh/sshd_config
+
+192.168.152.1 ust-control-003.ustapps.com ust-control-003
+192.168.152.2 ust-control-006.ustapps.com ust-control-006
+192.168.152.3 ust-control-007.ustapps.com ust-control-007
+
+192.168.153.111 ust-cluster-001.ustapps.com ust-cluster-001
+
+192.168.152.4 ust-worker-001.ustapps.com ust-worker-001
+192.168.152.5 ust-worker-002.ustapps.com ust-worker-002
+192.168.152.6 ust-worker-003.ustapps.com ust-worker-003
+
+
+
+    server ust-control-002 192.168.152.1:6443 check verify none
+    server ust-control-003 192.168.152.2:6443 check verify none
+    server ust-control-006 192.168.152.3:6443 check verify none
+
+sudo systemctl restart networking
+
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=ust-control-003.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.152.1
+
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=ust-control-002.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.152.1
+
+sudo kubeadm reset --cri-socket=unix:///var/run/cri-dockerd.sock
+sudo kubeadm reset --cri-socket=unix:///var/run/containerd/containerd.sock
+sudo rm -rf /etc/kubernetes /var/lib/etcd /etc/cni/net.d /var/lib/cni ~/.kube
+
+mkdir -p /etc/kubernetes/manifests
+nano /etc/kubernetes/manifests/keepalived.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  name: keepalived
+  namespace: kube-system
+spec:
+  containers:
+  - image: osixia/keepalived:2.0.20
+    name: keepalived
+    resources: {}
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_BROADCAST
+        - NET_RAW
+    volumeMounts:
+    - mountPath: /usr/local/etc/keepalived/keepalived.conf
+      name: config
+    - mountPath: /etc/keepalived/check_apiserver.sh
+      name: check
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/keepalived/keepalived.conf
+    name: config
+  - hostPath:
+      path: /etc/keepalived/check_apiserver.sh
+    name: check
+status: {}
+
+touch /etc/haproxy/spoe-auth.conf
+nano /etc/kubernetes/manifests/haproxy.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: haproxy
+  namespace: kube-system
+spec:
+  containers:
+  - image: docker.ustapps.com/server/haproxy:0.1.1
+    name: haproxy
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: localhost
+        path: /healthz
+        port: 7443
+        scheme: HTTPS
+    volumeMounts:
+    - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+      name: haproxyconf
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/ssl
+      name: haproxyssl
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/spoe-auth.conf
+      name: haproxyspoe
+      readOnly: true
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/haproxy/haproxy.cfg
+      type: FileOrCreate
+    name: haproxyconf
+  - hostPath:
+      path: /etc/haproxy/ssl
+      type: DirectoryOrCreate
+    name: haproxyssl
+  - hostPath:
+      path: /etc/haproxy/spoe-auth.conf
+      type: FileOrCreate
+    name: haproxyspoe
+status: {}
+
+192.168.157.31   dev-us1.ustapps.com dev-us1
+192.168.157.32   dev-us2.ustapps.com dev-ust2
+192.168.157.33   dev-us3.ustapps.com dev-us3
+192.168.157.34   dev-us4.ustapps.com dev-us4
+
+192.168.157.51   dev-cluster-us1.ustapps.com dev-cluster-us1
+
+KUBELET_EXTRA_ARGS="--node-ip=192.168.157.31" 
+
+	server dev-us1 dev-us1.ustapps.com:6443 check verify none
+	server dev-us2 dev-us2.ustapps.com:6443 check verify none
+	server dev-us3 dev-us3.ustapps.com:6443 check verify none
+	server dev-us4 dev-us4.ustapps.com:6443 check verify none
+	server dev-cluster-us1 dev-cluster-us1.ustapps.com:6443 check verify none
+
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-cluster-us1.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.51
+
+
+
+kubeadm join dev-us1.ustapps.com:7443 \
+  --token 135928.fg21ugj3mxqoj4ll \
+  --discovery-token-ca-cert-hash sha256:b61357174cba599cf7258a71aa4dbc94d73aa5445c63ededcc405a0e723b8c4e \
+  --control-plane \
+  --certificate-key 8d0e546d336148183d1b8e13549363535df3f9d19a3f2c3e52bc7cc4d1dc9d7e \
+  --cri-socket=unix:///var/run/cri-dockerd.sock \
+  --apiserver-advertise-address=192.168.157.31 -v=5
+
+kubeadm join dev-us1.ustapps.com:7443 \
+  --token 135928.fg21ugj3mxqoj4ll \
+  --discovery-token-ca-cert-hash sha256:b61357174cba599cf7258a71aa4dbc94d73aa5445c63ededcc405a0e723b8c4e \
+  --cri-socket=unix:///var/run/cri-dockerd.sock \
+  --node-ip=192.168.157.31 -v=5
