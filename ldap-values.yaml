@@ -49,7 +49,7 @@ customLdifFiles:
     objectclass: organizationalRole
     objectclass: top
     objectclass: simpleSecurityObject
-    userpassword: {SSHA}zIOJi7SWqdzF008CXUk30Wm5/6HaBzDR
+    userpassword: {SSHA}yCFLATeQcVjsVASe3uMBWq76PpxnlFc5
   06-ssp-app.ldif: |-
     dn: cn=ssp,ou=applications,dc=ustapps,dc=com
     cn: ssp
@@ -57,7 +57,7 @@ customLdifFiles:
     objectclass: organizationalRole
     objectclass: top
     objectclass: simpleSecurityObject
-    userpassword: {SSHA}zIOJi7SWqdzF008CXUk30Wm5/6HaBzDR
+    userpassword: {SSHA}yCFLATeQcVjsVASe3uMBWq76PpxnlFc5
 customAcls: |-
    dn: olcDatabase={2}mdb,cn=config
    changetype: modify
@@ -88,61 +88,6 @@ customAcls: |-
      by dn.children="ou=applications,dc=ustapps,dc=com" read
      by self read
      by anonymous auth
-     by * none
-   olcAccess: {2}to dn.children="ou=groups,dc=ustapps,dc=com"
-     by dn.exact="cn=admin,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by dn.children="ou=applications,dc=ustapps,dc=com" read
-     by self read
-     by anonymous auth
-     by * none
-   olcAccess: {3}to dn.children="ou=applications,dc=ustapps,dc=com"
-     by dn.exact="cn=admin,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by dn.children="ou=applications,dc=ustapps,dc=com" read
-     by self read
-     by anonymous auth
-     by * none
-   olcAccess: {4}to dn.children="ou=server,dc=ustapps,dc=com"
-     by dn.exact="cn=admin,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by dn.children="ou=applications,dc=ustapps,dc=com" read
-     by self read
-     by anonymous auth
-     by * none
-   olcAccess: {5}to *
-     by dn="cn=admin,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write    
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_admin,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=admin,cn=ldap,ou=groups,dc=ustapps,dc=com" write
-     by group/groupOfNames/member.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfNames/member.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=ldap_observer,ou=groups,dc=ustapps,dc=com" read
-     by group/groupOfUniqueNames/uniqueMember.exact="cn=observer,cn=ldap,ou=groups,dc=ustapps,dc=com" read
-     by dn.children="ou=applications,dc=ustapps,dc=com" search
-     by self read
      by * none
 persistence:
   size: 8Gi
