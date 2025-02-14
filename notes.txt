@@ -19,11 +19,102 @@ iface enp0s3:0 inet static
 192.168.157.1   dev-cluster-ph01.ustapps.com dev-cluster-ph01
 192.168.157.2   dev-ldap-ph01.ustapps.com dev-ldap-ph01
 
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-ph01.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.31
+
+RESET
+
+sudo kubeadm reset --cri-socket=unix:///var/run/cri-dockerd.sock
+sudo kubeadm reset --cri-socket=unix:///var/run/containerd/containerd.sock
+sudo rm -rf /etc/kubernetes /var/lib/etcd /etc/cni/net.d /var/lib/cni ~/.kube
+
+mkdir -p /etc/kubernetes/manifests
+nano /etc/kubernetes/manifests/keepalived.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  name: keepalived
+  namespace: kube-system
+spec:
+  containers:
+  - image: osixia/keepalived:2.0.20
+    name: keepalived
+    resources: {}
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_BROADCAST
+        - NET_RAW
+    volumeMounts:
+    - mountPath: /usr/local/etc/keepalived/keepalived.conf
+      name: config
+    - mountPath: /etc/keepalived/check_apiserver.sh
+      name: check
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/keepalived/keepalived.conf
+    name: config
+  - hostPath:
+      path: /etc/keepalived/check_apiserver.sh
+    name: check
+status: {}
+
+mkdir -p /usr/local/etc/haproxy/ssl
+touch /etc/haproxy/spoe-auth.conf
+nano /etc/kubernetes/manifests/haproxy.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: haproxy
+  namespace: kube-system
+spec:
+  containers:
+  - image: docker.ustapps.com/server/haproxy:0.1.1
+    name: haproxy
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: localhost
+        path: /healthz
+        port: 7443
+        scheme: HTTPS
+    volumeMounts:
+    - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+      name: haproxyconf
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/ssl
+      name: haproxyssl
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/spoe-auth.conf
+      name: haproxyspoe
+      readOnly: true
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/haproxy/haproxy.cfg
+      type: FileOrCreate
+    name: haproxyconf
+  - hostPath:
+      path: /etc/haproxy/ssl
+      type: DirectoryOrCreate
+    name: haproxyssl
+  - hostPath:
+      path: /etc/haproxy/spoe-auth.conf
+      type: FileOrCreate
+    name: haproxyspoe
+status: {}
 
 
-kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-cluster-ph01.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.31su -
 
-visudo
+
+
+
+OLD
+
 
 # User privelage specification
 root ALL=(ALL:ALL) ALL

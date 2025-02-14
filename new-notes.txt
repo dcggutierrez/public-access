@@ -1,0 +1,286 @@
+nano /etc/network/interfaces
+
+# allow-hotplug enp0s3
+auto enp0s3
+iface enp0s3 inet dhcp
+
+auto enp0s3:0
+iface enp0s3:0 inet static
+    address 192.168.157.32  # Replace with actual IP
+    netmask 255.255.252.0
+
+nano /etc/hosts
+
+192.168.157.31   dev-ph01.ustapps.com dev-ph01
+192.168.157.32   dev-ph02.ustapps.com dev-ph02
+192.168.157.33   dev-ph03.ustapps.com dev-ph03
+192.168.157.34   dev-ph04.ustapps.com dev-ph04
+192.168.157.35   dev-ph05.ustapps.com dev-ph05
+192.168.157.36   dev-ph06.ustapps.com dev-ph06
+
+192.168.157.1   dev-cluster-ph01.ustapps.com dev-cluster-ph01
+192.168.157.2   dev-ldap-ph01.ustapps.com dev-ldap-ph01
+
+mkdir /etc/keepalived
+nano /etc/keepalived/keepalived.conf
+
+global_defs {
+    router_id LVS_DEVEL
+}
+vrrp_script check_apiserver {
+  script "/etc/keepalived/check_apiserver.sh"
+  interval 3
+  weight -2
+  fall 10
+  rise 2
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface enp0s3
+    virtual_router_id 31
+    priority 101
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+    virtual_ipaddress {
+        192.168.157.1
+    }
+    track_script {
+        check_apiserver
+    }
+}
+
+nano /etc/keepalived/check_apiserver.sh
+
+#!/bin/sh
+
+errorExit() {
+    echo "*** $*" 1>&2
+    exit 1
+}
+
+curl -sfk --max-time 2 https://localhost:7443/healthz -o /dev/null || errorExit 
+
+mkdir /etc/haproxy
+nano /etc/haproxy/haproxy.cfg
+
+# /etc/haproxy/haproxy.cfg
+#---------------------------------------------------------------------
+# Global settings
+#---------------------------------------------------------------------
+global
+    log stdout format raw local0
+    daemon
+
+#---------------------------------------------------------------------
+# common defaults that all the 'listen' and 'backend' sections will
+# use if not designated in their block
+#---------------------------------------------------------------------
+defaults
+    mode                    http
+    log                     global
+    option                  httplog
+    option                  dontlognull
+    option http-server-close
+#    option forwardfor       except 127.0.0.0/8
+    option                  redispatch
+    retries                 1
+    timeout http-request    10s
+    timeout queue           20s
+    timeout connect         5s
+    timeout client          35s
+    timeout server          35s
+    timeout http-keep-alive 10s
+    timeout check           10s
+    default-server init-addr last,libc,none
+    
+#---------------------------------------------------------------------
+# apiserver frontend which proxys to the control plane nodes
+#---------------------------------------------------------------------
+frontend apiserver
+    bind 192.168.157.1:7443
+    mode tcp
+    option tcplog
+    default_backend apiserverbackend
+
+#---------------------------------------------------------------------
+# round robin balancing for apiserver
+#---------------------------------------------------------------------
+backend apiserverbackend
+    option httpchk
+
+    http-check connect ssl
+    http-check send meth GET uri /healthz
+    http-check expect status 200
+
+    mode tcp
+    balance     roundrobin
+    
+    server dev-ph01 dev-ph01.ustapps.com:6443 check verify none
+    server dev-ph02 dev-ph02.ustapps.com:6443 check verify none
+    server dev-ph03 dev-ph03.ustapps.com:6443 check verify none
+    server dev-ph04 dev-ph04.ustapps.com:6443 check verify none
+    server dev-ph05 dev-ph05.ustapps.com:6443 check verify none
+    server dev-ph06 dev-ph06.ustapps.com:6443 check verify none
+
+mkdir -p /etc/kubernetes/manifests
+nano /etc/kubernetes/manifests/keepalived.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  name: keepalived
+  namespace: kube-system
+spec:
+  containers:
+  - image: osixia/keepalived:2.0.20
+    name: keepalived
+    resources: {}
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_BROADCAST
+        - NET_RAW
+    volumeMounts:
+    - mountPath: /usr/local/etc/keepalived/keepalived.conf
+      name: config
+    - mountPath: /etc/keepalived/check_apiserver.sh
+      name: check
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/keepalived/keepalived.conf
+    name: config
+  - hostPath:
+      path: /etc/keepalived/check_apiserver.sh
+    name: check
+status: {}
+
+mkdir -p /usr/local/etc/haproxy/ssl
+touch /etc/haproxy/spoe-auth.conf
+nano /etc/kubernetes/manifests/haproxy.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: haproxy
+  namespace: kube-system
+spec:
+  containers:
+  - image: docker.ustapps.com/server/haproxy:0.1.1
+    name: haproxy
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: localhost
+        path: /healthz
+        port: 7443
+        scheme: HTTPS
+    volumeMounts:
+    - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+      name: haproxyconf
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/ssl
+      name: haproxyssl
+      readOnly: true
+    - mountPath: /usr/local/etc/haproxy/spoe-auth.conf
+      name: haproxyspoe
+      readOnly: true
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/haproxy/haproxy.cfg
+      type: FileOrCreate
+    name: haproxyconf
+  - hostPath:
+      path: /etc/haproxy/ssl
+      type: DirectoryOrCreate
+    name: haproxyssl
+  - hostPath:
+      path: /etc/haproxy/spoe-auth.conf
+      type: FileOrCreate
+    name: haproxyspoe
+status: {}
+
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-cluster-ph01.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.31
+
+  kubeadm join dev-cluster-ph01.ustapps.com:7443 --token e4994y.x6ry8jqii3vzq6gg \
+        --discovery-token-ca-cert-hash sha256:97bdee6576b159fb370d0137384b46e3ec06356a2be421ba725aab504a5e4db1 \
+        --control-plane --certificate-key 77b114ccebbcefb27ba437f00f67e9394f984223d1d32cece1499c96f87a1ddd
+
+
+
+kubeadm join cluster-us01.ustapps.com:7443 --token e4994y.x6ry8jqii3vzq6gg \
+  --discovery-token-ca-cert-hash sha256:97bdee6576b159fb370d0137384b46e3ec06356a2be421ba725aab504a5e4db1 \
+  --control-plane --certificate-key 77b114ccebbcefb27ba437f00f67e9394f984223d1d32cece1499c96f87a1ddd \
+  --cri-socket=unix:///var/run/cri-dockerd.sock --apiserver-advertise-address=192.168.xxx.xxx -v=5
+
+
+sudo shutdown -h now
+
+sudo systemctl restart docker  # or containerd
+sudo systemctl restart kubelet
+
+kubectl get nodes
+kubectl get pods -n kube-system
+sudo systemctl status kubelet
+sudo systemctl status docker
+ip addr show | grep 192.168.157.1
+sudo systemctl status haproxy
+kubectl cluster-info
+curl -k https://192.168.157.1:6443/healthz
+kubectl run test-nginx --image=nginx --restart=Never
+kubectl get pods
+
+kubectl delete pod test-nginx
+sudo systemctl restart keepalived
+
+sudo nano /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+ExecStart=/usr/bin/kubelet --node-ip=192.168.157.31
+
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+sudo systemctl status kubelet
+
+sudo kubeadm reset --force
+sudo rm -rf /etc/kubernetes/ /var/lib/etcd /var/lib/kubelet /var/lib/cni /etc/cni
+sudo systemctl restart networking
+sudo ip link delete cni0 || true
+sudo ip link delete flannel.1 || true
+sudo systemctl restart kubelet
+
+kubeadm init \
+  --cri-socket=unix:///var/run/cri-dockerd.sock \
+  --control-plane-endpoint=dev-cluster-us01.ustapps.com:7443 \
+  --upload-certs \
+  --pod-network-cidr=10.244.0.0/16 \
+  --apiserver-advertise-address=192.168.157.31
+
+wget https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+nano kube-flannel.yml
+
+- --iface-can-reach=192.168.144.0
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+kubectl apply -f kube-flannel.yml
+
+nano /etc/resolv.conf
+
+domain ustapps.com
+search ustapps.com cluster.local
+nameserver 10.96.0.10
+nameserver 192.168.1.1
+nameserver 192.168.0.1
+nameserver 8.8.8.8
+
+nano /etc/dhcp/dhclient.conf
+
+supersede domain-name "ustapps.com";
+prepend domain-name-servers 10.96.0.10;
+
+nano /etc/kubernetes/manifests/haproxy.yaml

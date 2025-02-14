@@ -2,6 +2,35 @@ sudo kubeadm reset --cri-socket=unix:///var/run/cri-dockerd.sock
 sudo kubeadm reset --cri-socket=unix:///var/run/containerd/containerd.sock
 sudo rm -rf /etc/kubernetes /var/lib/etcd /etc/cni/net.d /var/lib/cni ~/.kube
 
+# 1. Remove the static pod manifests for HAProxy and Keepalived
+sudo rm /etc/kubernetes/manifests/haproxy.yaml
+sudo rm /etc/kubernetes/manifests/keepalived.yaml
+
+# 2. Remove custom config files (backup them first if needed)
+sudo rm /etc/keepalived/keepalived.conf
+sudo rm /etc/keepalived/check_apiserver.sh
+sudo rm /etc/haproxy/haproxy.cfg
+sudo rm /etc/haproxy/spoe-auth.conf
+
+# 3. (Optional) Remove the HAProxy SSL directory if you no longer need it
+sudo rm -rf /usr/local/etc/haproxy/ssl
+
+# 4. Reset the Kubernetes cluster
+sudo kubeadm reset --cri-socket=unix:///var/run/cri-dockerd.sock
+
+# 5. Remove your kubeconfig (if you want a clean start)
+rm -f ~/.kube/config
+
+# 6. Remove the custom HAProxy Docker image
+docker rmi docker.ustapps.com/server/haproxy:0.1.1
+
+# 7. (Optional) Reboot to ensure DNS and network changes take effect
+sudo reboot
+
+nano /var/lib/kubelet/kubeadm-flags.env
+
+KUBELET_KUBEADM_ARGS="--node-ip=192.168.xxx.xxx"
+
 mkdir -p /etc/kubernetes/manifests
 nano /etc/kubernetes/manifests/keepalived.yaml
 
@@ -37,6 +66,7 @@ spec:
     name: check
 status: {}
 
+mkdir -p /usr/local/etc/haproxy/ssl
 touch /etc/haproxy/spoe-auth.conf
 nano /etc/kubernetes/manifests/haproxy.yaml
 
@@ -84,22 +114,24 @@ status: {}
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
-kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-us1.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.31
+kubeadm init --cri-socket=unix:///var/run/cri-dockerd.sock --control-plane-endpoint=dev-cluster-ph01.ustapps.com:7443 --upload-certs --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.157.31
 
-kubeadm join dev-us1.ustapps.com:7443 \
-  --token hos3nx.vmsxbjs9msmvczs6  \
-  --discovery-token-ca-cert-hash sha256:575143f986dfd2296fa195f5e3177e781d0a33871a32d5278460a2fbc73beac2 \
+  kubeadm join dev-cluster-ph01.ustapps.com:7443 --token eapcuy.uabwh8xptgp7glsb \
+        --discovery-token-ca-cert-hash sha256:34fd79cb1ae7d87182732c05ad1c9340c04e3c528c956b0e3f032643bbf7d394 \
+        --control-plane --certificate-key 964aa6c33b85064bd1405a6249491a9f1eb7fe3c8367a3aa2ca72c370c128c31
+
+kubeadm join dev-cluster-ph01.ustapps.com:7443 \
+  --token eapcuy.uabwh8xptgp7glsb  \
+  --discovery-token-ca-cert-hash sha256:34fd79cb1ae7d87182732c05ad1c9340c04e3c528c956b0e3f032643bbf7d394 \
   --control-plane \
-  --certificate-key 2037322f0ec7e097eafe42313777e17b4f9ee91fe4e8c93103ea6475b95bcac8  \
+  --certificate-key 964aa6c33b85064bd1405a6249491a9f1eb7fe3c8367a3aa2ca72c370c128c31  \
   --cri-socket=unix:///var/run/cri-dockerd.sock \
   --apiserver-advertise-address=192.168.157.32 -v=5
- 
-kubeadm join dev-us1.ustapps.com:7443 \
-  --token hos3nx.vmsxbjs9msmvczs6 \
-  --discovery-token-ca-cert-hash sha256:575143f986dfd2296fa195f5e3177e781d0a33871a32d5278460a2fbc73beac2 \
-  --cri-socket=unix:///var/run/cri-dockerd.sock 
 
-  --node-ip=192.168.157.33 -v=5
+kubeadm join dev-us1.ustapps.com:7443 \
+  --token 8zc0i9.ygck0aq9obn24v1x \
+  --discovery-token-ca-cert-hash sha256:0e693f569a6f8bacfa2d71fa4c70a23ac836cd615e9aaa2ff7c678dbcba51e7b \
+  --cri-socket=unix:///var/run/cri-dockerd.sock 
 
 nano /var/lib/kubelet/config.yaml
 
